@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Website Crawler — 網站文章爬蟲控制台</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="background-glow glow-1"></div>
+    <div class="background-glow glow-2"></div>
+    
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="logo-area">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path>
+                        <path d="M2 12h20"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h1>Website Crawler</h1>
+                    <p class="subtitle">針對 Blogspot 與通用網站的自動化文章爬取與內容萃取引擎</p>
+                </div>
+            </div>
+            <div class="connection-status" id="connectionStatus">
+                <span class="status-dot"></span>
+                <span id="connectionText">已連線</span>
+            </div>
+        </header>
+
+        <!-- Main Grid Layout -->
+        <main class="main-grid">
+            <!-- Left Column: Controls & Configuration -->
+            <section class="card config-card">
+                <div class="card-header">
+                    <h2>爬取設定</h2>
+                    <span class="badge" id="jobStatusBadge">閒置中</span>
+                </div>
+
+                <form id="crawlForm" class="crawl-form">
+                    <div class="form-group">
+                        <label for="rootUrl">目標網站首頁或文章網址</label>
+                        <div class="input-wrapper">
+                            <input 
+                                type="url" 
+                                id="rootUrl" 
+                                name="rootUrl" 
+                                placeholder="https://creationsjourneytolife.blogspot.com" 
+                                required
+                                value="https://creationsjourneytolife.blogspot.com"
+                            />
+                        </div>
+                        <small class="helper-text">系統將自動以此網域為邊界，遞迴探索並抽取所有文章正文</small>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group flex-1">
+                            <label for="outputFormat">儲存格式</label>
+                            <div class="select-wrapper">
+                                <select id="outputFormat" name="outputFormat">
+                                    <option value="md">Markdown (.md) — 乾淨排版</option>
+                                    <option value="html">HTML (.html) — 獨立乾淨頁面</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button type="submit" id="startBtn" class="btn btn-primary">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                            開始爬取
+                        </button>
+                        <button type="button" id="pauseBtn" class="btn btn-secondary" style="display: none;">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+                            暫停
+                        </button>
+                        <button type="button" id="resumeBtn" class="btn btn-success" style="display: none;">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                            繼續
+                        </button>
+                        <button type="button" id="cancelBtn" class="btn btn-danger" style="display: none;">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                            取消
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Output Folder Info -->
+                <div class="output-folder-box" id="outputFolderBox" style="display: none;">
+                    <div class="folder-icon">📁</div>
+                    <div class="folder-details">
+                        <div class="folder-title">本機儲存目錄</div>
+                        <div class="folder-path" id="folderPathText">./output/...</div>
+                    </div>
+                    <button type="button" class="btn-copy" id="copyFolderBtn" title="複製路徑">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Right Column: Real-time Stats & Article Stream -->
+            <section class="card stats-card">
+                <div class="card-header">
+                    <h2>爬取進度與統計</h2>
+                    <span class="pulse-indicator" id="pulseIndicator"></span>
+                </div>
+
+                <!-- Stats Grid -->
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="stat-number" id="statDiscovered">0</div>
+                        <div class="stat-label">已發現連結</div>
+                    </div>
+                    <div class="stat-box success">
+                        <div class="stat-number" id="statCrawled">0</div>
+                        <div class="stat-label">已抓取文章</div>
+                    </div>
+                    <div class="stat-box danger">
+                        <div class="stat-number" id="statFailed">0</div>
+                        <div class="stat-label">失敗或空頁</div>
+                    </div>
+                </div>
+
+                <!-- Live Stream Table -->
+                <div class="articles-header">
+                    <h3>已抓取文章列表 (<span id="articleCount">0</span>)</h3>
+                </div>
+                
+                <div class="articles-container">
+                    <div class="empty-state" id="emptyState">
+                        <div class="empty-icon">📄</div>
+                        <p>尚未開始爬取或暫無文章</p>
+                        <small>點擊「開始爬取」後，萃取的文章將即時在此列出</small>
+                    </div>
+                    <ul class="articles-list" id="articlesList"></ul>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Robots Warning Modal -->
+    <div class="modal-overlay" id="robotsModal" style="display: none;">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div class="warning-icon">⚠️</div>
+                <h3>robots.txt 爬取限制提醒</h3>
+            </div>
+            <div class="modal-body">
+                <p>目標網站的 <code>robots.txt</code> 偵測到爬取限制規範：</p>
+                <div class="code-block" id="robotsReasonText">Disallow: /</div>
+                <p class="question">您希望如何處理？</p>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" id="modalCancelBtn">取消爬取</button>
+                <button type="button" class="btn btn-warning" id="modalProceedBtn">依然繼續 (Proceed Anyway)</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
