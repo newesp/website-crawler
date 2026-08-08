@@ -196,8 +196,14 @@ function addDiscoveredLink(url, pageType, status) {
     linksList.prepend(li);
 
     discoveredLinksMap.set(url, { element: li, badge: badge, pageType: pageType });
-    discoveredCount.textContent = discoveredLinksMap.size;
-    statDiscovered.textContent = discoveredLinksMap.size;
+    updateDiscoveredCount(discoveredLinksMap.size);
+}
+
+function updateDiscoveredCount(newCount) {
+    const currentCount = parseInt(statDiscovered.textContent) || 0;
+    const bestCount = Math.max(currentCount, newCount);
+    statDiscovered.textContent = bestCount;
+    discoveredCount.textContent = bestCount;
 }
 
 function updateLinkStatus(url, status) {
@@ -269,8 +275,7 @@ function getStatusText(status) {
 // Update counters
 function updateStats(stats) {
     if (stats.discovered !== undefined) {
-        statDiscovered.textContent = stats.discovered;
-        discoveredCount.textContent = stats.discovered;
+        updateDiscoveredCount(stats.discovered);
     }
     if (stats.crawled_articles !== undefined) {
         statCrawled.textContent = stats.crawled_articles;
@@ -332,6 +337,9 @@ async function startCrawl(ignoreRobots = false) {
     discoveredLinksMap.clear();
     linksList.innerHTML = "";
     articlesList.innerHTML = "";
+    statDiscovered.textContent = "0";
+    statCrawled.textContent = "0";
+    statFailed.textContent = "0";
     discoveredCount.textContent = "0";
     articleCount.textContent = "0";
 
