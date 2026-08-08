@@ -18,6 +18,8 @@ def normalize_url(url: str) -> str:
     parsed = urlparse(defragged)
     
     scheme = parsed.scheme.lower()
+    if scheme == 'http':
+        scheme = 'https'
     netloc = parsed.netloc.lower()
     path = parsed.path
     
