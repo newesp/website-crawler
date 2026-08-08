@@ -80,22 +80,24 @@
                         </div>
 
                         <div class="action-buttons">
-                            <button type="submit" id="startBtn" class="btn btn-primary">
+                            <button type="submit" id="startBtn" class="btn btn-primary btn-full">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
                                 開始爬取
                             </button>
-                            <button type="button" id="pauseBtn" class="btn btn-secondary" style="display: none;">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
-                                暫停
-                            </button>
-                            <button type="button" id="resumeBtn" class="btn btn-success" style="display: none;">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-                                繼續
-                            </button>
-                            <button type="button" id="cancelBtn" class="btn btn-danger" style="display: none;">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                                取消
-                            </button>
+                            <div class="inline-controls" id="inlineControls" style="display: none;">
+                                <button type="button" id="pauseBtn" class="btn btn-secondary btn-sm">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+                                    暫停
+                                </button>
+                                <button type="button" id="resumeBtn" class="btn btn-success btn-sm" style="display: none;">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                                    繼續
+                                </button>
+                                <button type="button" id="cancelBtn" class="btn btn-danger btn-sm">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                    取消
+                                </button>
+                            </div>
                         </div>
                     </form>
 

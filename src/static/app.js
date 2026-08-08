@@ -230,8 +230,11 @@ function updateJobStatus(status) {
     jobStatusBadge.textContent = getStatusText(status);
     jobStatusBadge.className = `badge ${status}`;
 
+    const inlineControls = document.getElementById("inlineControls");
+
     if (status === "running") {
         startBtn.style.display = "none";
+        inlineControls.style.display = "flex";
         pauseBtn.style.display = "inline-flex";
         resumeBtn.style.display = "none";
         cancelBtn.style.display = "inline-flex";
@@ -239,14 +242,13 @@ function updateJobStatus(status) {
         outputFormatSelect.disabled = true;
     } else if (status === "paused") {
         startBtn.style.display = "none";
+        inlineControls.style.display = "flex";
         pauseBtn.style.display = "none";
         resumeBtn.style.display = "inline-flex";
         cancelBtn.style.display = "inline-flex";
     } else {
         startBtn.style.display = "inline-flex";
-        pauseBtn.style.display = "none";
-        resumeBtn.style.display = "none";
-        cancelBtn.style.display = "none";
+        inlineControls.style.display = "none";
         rootUrlInput.disabled = false;
         outputFormatSelect.disabled = false;
         clearActiveUrl();
