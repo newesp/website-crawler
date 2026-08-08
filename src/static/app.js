@@ -101,7 +101,8 @@ function initWebSocket() {
 
 // Handle WebSocket event streams
 function handleCrawlerEvent(data) {
-    if (data.status) {
+    const jobEvents = ["job_started", "status_change", "job_completed", "job_failed"];
+    if (data.status && jobEvents.includes(data.event)) {
         updateJobStatus(data.status);
     }
     
