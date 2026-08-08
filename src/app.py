@@ -147,16 +147,26 @@ def create_app(db_path: str = "crawler.db", output_dir: str = "./output") -> Fas
     async def get_current_status():
         latest_job = await db.get_latest_job()
         if not latest_job:
-            return {"status": "idle", "job": None, "articles": [], "stats": {"discovered": 0, "crawled_articles": 0, "failed": 0}}
+            return {
+                "status": "idle",
+                "job": None,
+                "articles": [],
+                "urls": [],
+                "stats": {"discovered": 0, "crawled_articles": 0, "failed": 0},
+                "active_url": None
+            }
             
         stats = await db.get_job_stats(latest_job["id"])
         articles = await db.get_crawled_articles(latest_job["id"])
+        urls = await db.get_crawled_urls(latest_job["id"])
         
         return {
             "status": engine.status.value if engine.current_job_id == latest_job["id"] else latest_job["status"],
             "job": latest_job,
             "stats": stats,
-            "articles": articles
+            "articles": articles,
+            "urls": urls,
+            "active_url": engine.active_url
         }
 
     @app.get("/api/jobs/{job_id}")
@@ -166,10 +176,12 @@ def create_app(db_path: str = "crawler.db", output_dir: str = "./output") -> Fas
             raise HTTPException(status_code=404, detail="Job not found")
         stats = await db.get_job_stats(job_id)
         articles = await db.get_crawled_articles(job_id)
+        urls = await db.get_crawled_urls(job_id)
         return {
             "job": job,
             "stats": stats,
-            "articles": articles
+            "articles": articles,
+            "urls": urls
         }
 
     @app.websocket("/ws/progress")
@@ -180,12 +192,17 @@ def create_app(db_path: str = "crawler.db", output_dir: str = "./output") -> Fas
             latest_job = await db.get_latest_job()
             if latest_job:
                 stats = await db.get_job_stats(latest_job["id"])
+                articles = await db.get_crawled_articles(latest_job["id"])
+                urls = await db.get_crawled_urls(latest_job["id"])
                 await websocket.send_json({
                     "event": "initial_state",
                     "job_id": latest_job["id"],
                     "status": engine.status.value if engine.current_job_id == latest_job["id"] else latest_job["status"],
                     "output_dir": latest_job["output_dir"],
-                    "stats": stats
+                    "stats": stats,
+                    "articles": articles,
+                    "urls": urls,
+                    "active_url": engine.active_url
                 })
             while True:
                 # Keep connection alive

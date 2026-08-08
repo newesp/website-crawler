@@ -72,6 +72,39 @@ async def test_crawler_full_cycle(setup_engine):
     assert articles[0]["file_path"].endswith("day-574-using-shame.md")
 
 @pytest.mark.asyncio
+async def test_crawler_priority_queue(setup_engine):
+    engine, db, out_dir = setup_engine
+    root_url = "https://creationsjourneytolife.blogspot.com"
+    
+    # Root homepage returns both an index link and an article link
+    root_html = """
+    <html><body>
+        <a href="/search/label/Philosophy">Index Label</a>
+        <a href="/2019/04/day-574-using-shame.html">Article 574</a>
+    </body></html>
+    """
+    
+    crawled_order = []
+    
+    async def mock_handler(request):
+        url = str(request.url)
+        crawled_order.append(url)
+        if "day-574" in url:
+            return httpx.Response(200, text="<html><body><h1 class='post-title'>574</h1><div class='post-body'>Body</div></body></html>")
+        elif "Philosophy" in url:
+            return httpx.Response(200, text="<html><body><a href='/2018/01/old-article.html'>Old Article</a></body></html>")
+        else:
+            return httpx.Response(200, text=root_html)
+            
+    transport = httpx.MockTransport(mock_handler)
+    
+    await engine.start_crawl(root_url=root_url, output_format="md", mock_transport=transport, max_pages=3)
+    
+    # Expected order: Root URL -> Article 574 (High priority) -> Index Philosophy (Low priority)
+    assert len(crawled_order) >= 2
+    assert "day-574" in crawled_order[1] # Article prioritized over Index Philosophy!
+
+@pytest.mark.asyncio
 async def test_crawler_pause_and_cancel(setup_engine):
     engine, db, out_dir = setup_engine
     root_url = "https://creationsjourneytolife.blogspot.com"

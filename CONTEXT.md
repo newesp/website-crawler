@@ -24,6 +24,14 @@ _Avoid_: Spidering, link extraction
 A URL found during discovery that has not yet been classified or crawled.
 _Avoid_: Found URL, pending URL
 
+**Candidate Priority Queue**:
+A priority queue where candidate URLs are scheduled such that Article Pages are dequeued and extracted before Index Pages.
+_Avoid_: Task list, URL stack
+
+**Active URL**:
+The specific URL currently being fetched and processed by the crawler, highlighted in real-time in the UI.
+_Avoid_: Current link, working item
+
 **Article Page**:
 A page containing a single blog post or article with a title and body content. Distinguished from index pages by URL pattern (for Blogspot: `/<year>/<month>/<slug>.html`).
 _Avoid_: Post page, content page
@@ -51,6 +59,10 @@ _Avoid_: Filename, identifier
 **Crawl State**:
 The persistent record (in SQLite) of which URLs have been crawled, failed, or remain pending for a given root URL. Enables resume and incremental updates.
 _Avoid_: Progress, checkpoint
+
+**Tabbed Stream View**:
+The dashboard presentation splitting real-time progress into two dedicated tabs: Crawled Articles and Discovered Links.
+_Avoid_: Multi-panel view, split screen
 
 **Fallback Rendering**:
 When a lightweight HTTP request (httpx) returns empty content, the system retries using a headless browser to handle JavaScript-rendered pages.

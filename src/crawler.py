@@ -40,6 +40,7 @@ class CrawlEngine:
         self.status = CrawlStatus.IDLE
         self.current_job_id: Optional[int] = None
         self.current_root_url: Optional[str] = None
+        self.active_url: Optional[str] = None
         
         # Async control primitives
         self._pause_event = asyncio.Event()
@@ -94,7 +95,7 @@ class CrawlEngine:
         max_pages: Optional[int] = None
     ) -> int:
         """
-        Main crawling loop. Supports resume and incremental updates.
+        Main crawling loop with Candidate Priority Queue (Articles prioritized over Index pages).
         """
         normalized_root = normalize_url(root_url)
         self.current_root_url = normalized_root
@@ -123,9 +124,24 @@ class CrawlEngine:
             "previously_crawled_count": len(previously_crawled_urls)
         })
         
-        # Setup BFS queues and seen sets
-        queue: deque[str] = deque([normalized_root])
+        # Candidate Priority Queues
+        # Articles get highest priority so we extract articles as soon as they are discovered
+        article_queue: deque[str] = deque()
+        index_queue: deque[str] = deque()
+        
+        root_type = self.classifier.classify(normalized_root)
+        if root_type == PageType.ARTICLE:
+            article_queue.append(normalized_root)
+        else:
+            index_queue.append(normalized_root)
+
         seen_in_this_run: Set[str] = {normalized_root}
+        
+        self._emit_progress("url_discovered", {
+            "url": normalized_root,
+            "page_type": root_type.value,
+            "status": "pending"
+        })
         
         client_kwargs = {"timeout": 15.0}
         if mock_transport:
@@ -135,14 +151,25 @@ class CrawlEngine:
         
         try:
             async with httpx.AsyncClient(**client_kwargs) as client:
-                while queue and not self._cancel_requested:
+                while (article_queue or index_queue) and not self._cancel_requested:
                     # Handle pause state
                     await self._pause_event.wait()
                     if self._cancel_requested:
                         break
 
-                    current_url = queue.popleft()
-                    page_type = self.classifier.classify(current_url)
+                    # Priority scheduling: Pop article first, then index
+                    if article_queue:
+                        current_url = article_queue.popleft()
+                        page_type = PageType.ARTICLE
+                    else:
+                        current_url = index_queue.popleft()
+                        page_type = PageType.INDEX
+
+                    self.active_url = current_url
+                    self._emit_progress("url_active", {
+                        "url": current_url,
+                        "page_type": page_type.value
+                    })
 
                     # Check if already successfully saved in past runs
                     if page_type == PageType.ARTICLE and current_url in previously_crawled_urls:
@@ -153,6 +180,11 @@ class CrawlEngine:
                             status="skipped",
                             title="[Previously Crawled]"
                         )
+                        self._emit_progress("url_status_change", {
+                            "url": current_url,
+                            "status": "skipped",
+                            "page_type": page_type.value
+                        })
                         # Still fetch candidate links so we can reach older/deeper unvisited articles
                         try:
                             html = await self.fetcher.fetch(current_url, client=client)
@@ -160,7 +192,16 @@ class CrawlEngine:
                             for link in new_links:
                                 if link not in seen_in_this_run and is_same_host(normalized_root, link):
                                     seen_in_this_run.add(link)
-                                    queue.append(link)
+                                    l_type = self.classifier.classify(link)
+                                    if l_type == PageType.ARTICLE:
+                                        article_queue.append(link)
+                                    else:
+                                        index_queue.append(link)
+                                    self._emit_progress("url_discovered", {
+                                        "url": link,
+                                        "page_type": l_type.value,
+                                        "status": "pending"
+                                    })
                         except Exception:
                             pass
                         continue
@@ -182,6 +223,11 @@ class CrawlEngine:
                             status="failed",
                             error_message=str(e)
                         )
+                        self._emit_progress("url_status_change", {
+                            "url": current_url,
+                            "status": "failed",
+                            "error": str(e)
+                        })
                         self._emit_progress("url_failed", {
                             "url": current_url,
                             "error": str(e),
@@ -194,7 +240,16 @@ class CrawlEngine:
                     for link in new_links:
                         if link not in seen_in_this_run and is_same_host(normalized_root, link):
                             seen_in_this_run.add(link)
-                            queue.append(link)
+                            l_type = self.classifier.classify(link)
+                            if l_type == PageType.ARTICLE:
+                                article_queue.append(link)
+                            else:
+                                index_queue.append(link)
+                            self._emit_progress("url_discovered", {
+                                "url": link,
+                                "page_type": l_type.value,
+                                "status": "pending"
+                            })
 
                     # If this is an Article page, extract and save content
                     if page_type == PageType.ARTICLE:
@@ -222,6 +277,12 @@ class CrawlEngine:
                             previously_crawled_urls.add(current_url)
                             pages_crawled_count += 1
                             
+                            self._emit_progress("url_status_change", {
+                                "url": current_url,
+                                "status": "crawled",
+                                "title": article.title,
+                                "file_path": saved_path
+                            })
                             self._emit_progress("article_crawled", {
                                 "url": current_url,
                                 "title": article.title,
@@ -236,6 +297,11 @@ class CrawlEngine:
                                 status="failed",
                                 error_message="Empty article content extracted"
                             )
+                            self._emit_progress("url_status_change", {
+                                "url": current_url,
+                                "status": "failed",
+                                "error": "Empty content"
+                            })
                             self._emit_progress("url_failed", {
                                 "url": current_url,
                                 "error": "Empty article content",
@@ -249,6 +315,11 @@ class CrawlEngine:
                             page_type=page_type.value,
                             status="crawled"
                         )
+                        self._emit_progress("url_status_change", {
+                            "url": current_url,
+                            "status": "crawled",
+                            "page_type": page_type.value
+                        })
                         self._emit_progress("index_crawled", {
                             "url": current_url,
                             "stats": await self.db.get_job_stats(job_id)
@@ -258,6 +329,7 @@ class CrawlEngine:
                         break
 
             # Finalize status
+            self.active_url = None
             if self._cancel_requested:
                 self.status = CrawlStatus.CANCELLED
                 await self.db.update_job_status(job_id, CrawlStatus.CANCELLED.value)
@@ -272,6 +344,7 @@ class CrawlEngine:
             })
 
         except Exception as e:
+            self.active_url = None
             self.status = CrawlStatus.FAILED
             await self.db.update_job_status(job_id, CrawlStatus.FAILED.value, error_message=str(e))
             self._emit_progress("job_failed", {
