@@ -312,7 +312,7 @@ html, body {
     flex-direction: column;
     gap: 0.4rem;
     margin-top: 0.5rem;
-    margin-bottom: 1rem;
+    margin-bottom: 0.4rem;
 }
 
 .btn {
