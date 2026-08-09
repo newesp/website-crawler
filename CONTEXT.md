@@ -71,3 +71,19 @@ _Avoid_: Dynamic rendering, JS rendering
 **Politeness Delay**:
 A 1–2 second pause between consecutive HTTP requests to avoid overwhelming the target server.
 _Avoid_: Rate limit, throttle, backoff
+
+**YouTube Channel URL**:
+The canonical Root URL for the YouTube video crawler. All input formats (e.g., `/channel/UC...`, `/c/...`) are normalized to `https://www.youtube.com/@ChannelName`.
+_Avoid_: User URL, custom URL
+
+**Video Link**:
+A discovered YouTube video URL belonging to the channel. Treated as a "Discovered Link" in the UI rather than an "Article Page" because its content is not extracted.
+_Avoid_: Video page, YouTube article
+
+**Video List Export**:
+The final output of the YouTube crawler, which is a plain text or CSV file containing only the video URLs, without any extracted body content.
+_Avoid_: Extracted videos, scraped content
+
+**Publish Date Filter**:
+A date range filter evaluated against the video's public publish date, converted and compared in the user's local timezone.
+_Avoid_: Upload date, stream date

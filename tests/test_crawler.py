@@ -61,6 +61,8 @@ async def test_crawler_full_cycle(setup_engine):
     )
     
     job = await db.get_job(job_id)
+    if job["status"] != CrawlStatus.COMPLETED:
+        print("JOB FAILED:", job)
     assert job["status"] == CrawlStatus.COMPLETED
     
     stats = await db.get_job_stats(job_id)

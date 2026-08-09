@@ -1,4 +1,5 @@
 import asyncio
+import os
 import random
 from collections import deque
 from enum import Enum
@@ -19,6 +20,7 @@ class CrawlStatus(str, Enum):
     COMPLETED = "completed"
     CANCELLED = "cancelled"
     FAILED = "failed"
+    INTERRUPTED = "interrupted"
 
 class CrawlEngine:
     def __init__(
@@ -171,8 +173,14 @@ class CrawlEngine:
                         "page_type": page_type.value
                     })
 
-                    # Check if already successfully saved in past runs
+                    # Check if already successfully saved in past runs AND file still exists
+                    should_skip = False
                     if page_type == PageType.ARTICLE and current_url in previously_crawled_urls:
+                        file_path = previously_crawled_urls[current_url]
+                        if file_path and os.path.exists(file_path):
+                            should_skip = True
+
+                    if should_skip:
                         await self.db.add_crawled_url(
                             job_id=job_id,
                             url=current_url,
@@ -274,7 +282,8 @@ class CrawlEngine:
                                 title=article.title,
                                 file_path=saved_path
                             )
-                            previously_crawled_urls.add(current_url)
+                            # Add to previously_crawled_urls so we don't fetch it again in this run if encountered
+                            previously_crawled_urls[current_url] = saved_path
                             pages_crawled_count += 1
                             
                             self._emit_progress("url_status_change", {

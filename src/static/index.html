@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css?v=4">
+    <link rel="stylesheet" href="/static/style.css?v=6">
 </head>
 <body>
     <div class="background-glow glow-1"></div>
@@ -43,8 +43,20 @@
             </div>
         </header>
 
-        <!-- Main 100vh Grid Layout -->
-        <main class="main-grid">
+        <!-- Tool Switcher Navigation -->
+        <nav class="tool-nav-bar">
+            <button type="button" class="tool-nav-btn active" id="toolCrawlerBtn" onclick="switchToolMode('crawler')">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path><path d="M2 12h20"></path></svg>
+                網站文章爬蟲
+            </button>
+            <button type="button" class="tool-nav-btn" id="toolYoutubeBtn" onclick="switchToolMode('youtube')">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                YouTube 頻道影片擷取
+            </button>
+        </nav>
+
+        <!-- Main 100vh Grid Layout: Website Crawler -->
+        <main class="main-grid" id="crawlerView">
             <!-- Left Column: Controls & Configuration -->
             <section class="card config-card">
                 <div class="card-header">
@@ -112,7 +124,7 @@
                         </div>
                         <div class="stat-box success">
                             <div class="stat-number" id="statCrawled">0</div>
-                            <div class="stat-label">已抓取文章</div>
+                            <div class="stat-label">已抓取 (含 <span id="statSkipped">0</span> 篇跳過)</div>
                         </div>
                         <div class="stat-box danger">
                             <div class="stat-number" id="statFailed">0</div>
@@ -172,6 +184,106 @@
                 </div>
             </section>
         </main>
+
+        <!-- Main 100vh Grid Layout: YouTube Extractor -->
+        <main class="main-grid" id="youtubeView" style="display: none;">
+            <!-- Left Column: Controls & Configuration -->
+            <section class="card config-card">
+                <div class="card-header">
+                    <h2>YouTube 擷取設定</h2>
+                    <span class="badge" id="ytStatusBadge">準備就緒</span>
+                </div>
+
+                <div class="config-body">
+                    <form id="ytForm" class="crawl-form">
+                        <div class="form-group">
+                            <label for="ytChannelUrl">YouTube 頻道網址或 handle</label>
+                            <div class="input-wrapper">
+                                <input 
+                                    type="text" 
+                                    id="ytChannelUrl" 
+                                    name="ytChannelUrl" 
+                                    placeholder="https://www.youtube.com/@channel 或 @channel" 
+                                    required
+                                />
+                            </div>
+                            <small class="helper-text">支援 @頻道名稱、/channel/UC... 或 /c/... 格式</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label>發布日期篩選（本地時間）</label>
+                            <div class="date-filter-grid">
+                                <div class="date-input-group">
+                                    <span class="date-label">開始日期</span>
+                                    <input type="date" id="ytStartDate" name="ytStartDate" class="date-picker-input" />
+                                </div>
+                                <div class="date-input-group">
+                                    <span class="date-label">結束日期</span>
+                                    <input type="date" id="ytEndDate" name="ytEndDate" class="date-picker-input" />
+                                </div>
+                            </div>
+                            <small class="helper-text">留空全抓；只填結束抓到該日；只填開始抓到最新</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="ytExportFormat">匯出格式</label>
+                            <div class="select-wrapper">
+                                <select id="ytExportFormat" name="ytExportFormat">
+                                    <option value="csv">CSV 格式 (.csv) — 包含 URL 欄位</option>
+                                    <option value="txt">純文字清單 (.txt) — 每行一個網址</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="action-buttons">
+                            <button type="submit" id="ytStartBtn" class="btn btn-primary btn-full">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                                開始擷取影片連結
+                            </button>
+                        </div>
+                    </form>
+
+                    <!-- YouTube Download & Summary Box -->
+                    <div class="output-folder-box" id="ytOutputBox" style="display: none; margin-top: 1rem;">
+                        <div class="folder-icon">📥</div>
+                        <div class="folder-details">
+                            <div class="folder-title" id="ytExportSummaryText">共擷取 0 部影片</div>
+                            <div class="folder-path" id="ytExportFilenameText">youtube_export.csv</div>
+                        </div>
+                        <a id="ytDownloadLink" href="#" class="btn btn-success btn-sm" style="text-decoration: none; display: flex; align-items: center; gap: 0.3rem;">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                            下載
+                        </a>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Column: Video Links Stream -->
+            <section class="card stream-card">
+                <div class="tabs-header">
+                    <div class="tabs-nav">
+                        <div class="tab-btn active" style="cursor: default;">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                            影片連結清單 (<span id="ytVideoCount">0</span>)
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-secondary btn-sm" id="ytCopyAllBtn" style="display: none;">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                        複製所有網址
+                    </button>
+                </div>
+
+                <div class="tab-content" id="ytTabContent">
+                    <div class="empty-state" id="ytEmptyState">
+                        <div class="empty-icon">📺</div>
+                        <p>尚未擷取任何影片連結</p>
+                        <small>輸入 YouTube 頻道網址並設定日期範圍後，點擊開始擷取</small>
+                    </div>
+                    <ul class="links-list" id="ytVideoList" style="display: none;"></ul>
+                </div>
+            </section>
+        </main>
+
     </div>
 
     <!-- Robots Warning Modal -->
@@ -193,6 +305,6 @@
         </div>
     </div>
 
-    <script src="/static/app.js?v=4"></script>
+    <script src="/static/app.js?v=6"></script>
 </body>
 </html>

@@ -37,6 +37,13 @@ class Database:
             """)
             await db.execute("CREATE INDEX IF NOT EXISTS idx_crawled_urls_job_id ON crawled_urls(job_id)")
             await db.execute("CREATE INDEX IF NOT EXISTS idx_crawled_urls_url ON crawled_urls(url)")
+            # On startup, mark any stale running/paused jobs as interrupted
+            # (they were left behind by a previous server crash or restart)
+            now = datetime.now(timezone.utc).isoformat()
+            await db.execute("""
+            UPDATE crawl_jobs SET status = 'interrupted', updated_at = ?
+            WHERE status IN ('running', 'paused')
+            """, (now,))
             await db.commit()
 
     async def create_job(self, root_url: str, output_format: str, output_dir: str) -> int:
@@ -123,21 +130,30 @@ class Database:
             """, (job_id,))
             failed = (await cursor.fetchone())[0]
 
+            cursor = await db.execute("""
+            SELECT COUNT(*) FROM crawled_urls
+            WHERE job_id = ? AND page_type = 'article' AND status = 'skipped'
+            """, (job_id,))
+            skipped = (await cursor.fetchone())[0]
+
             return {
                 "discovered": total_discovered,
                 "crawled_articles": crawled_articles,
-                "failed": failed
+                "failed": failed,
+                "skipped": skipped
             }
 
-    async def get_successfully_crawled_urls_for_host(self, root_url: str) -> Set[str]:
+    async def get_successfully_crawled_urls_for_host(self, root_url: str) -> Dict[str, str]:
         """
         Returns all article URLs successfully crawled for this root_url across all jobs (for resume/incremental).
+        Returns a dict mapping normalized url to its absolute file path.
         """
         async with aiosqlite.connect(self.db_path) as db:
             cursor = await db.execute("""
-            SELECT DISTINCT c.url FROM crawled_urls c
+            SELECT c.url, c.file_path FROM crawled_urls c
             JOIN crawl_jobs j ON c.job_id = j.id
-            WHERE j.root_url = ? AND c.status = 'crawled'
+            WHERE j.root_url = ? AND c.status = 'crawled' AND c.file_path IS NOT NULL
             """, (root_url,))
             rows = await cursor.fetchall()
-            return {normalize_url(row[0]) for row in rows}
+            from src.normalizer import normalize_url
+            return {normalize_url(r[0]): r[1] for r in rows if r[1]}

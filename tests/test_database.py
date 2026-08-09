@@ -49,10 +49,11 @@ async def test_add_and_query_crawled_urls(db):
 async def test_seen_urls_for_resume(db):
     root_url = "https://creationsjourneytolife.blogspot.com"
     job1_id = await db.create_job(root_url, "md", "./output")
-    await db.add_crawled_url(job1_id, f"{root_url}/2019/04/day-574.html", "article", "crawled", title="Day 574")
+    await db.add_crawled_url(job1_id, f"{root_url}/2019/04/day-574.html", "article", "crawled", title="Day 574", file_path="/fake/path.md")
     await db.add_crawled_url(job1_id, f"{root_url}/2019/04/day-575.html", "article", "failed")
     
     seen = await db.get_successfully_crawled_urls_for_host(root_url)
     assert f"{root_url}/2019/04/day-574.html" in seen
+    assert seen[f"{root_url}/2019/04/day-574.html"] == "/fake/path.md"
     # Failed ones shouldn't prevent retry
     assert f"{root_url}/2019/04/day-575.html" not in seen

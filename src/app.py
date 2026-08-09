@@ -12,6 +12,7 @@ from src.database import Database
 from src.robots import RobotsChecker
 from src.exporter import ArticleExporter
 from src.crawler import CrawlEngine, CrawlStatus
+from src.youtube import YouTubeExtractor
 
 class StartCrawlRequest(BaseModel):
     root_url: str
@@ -20,6 +21,12 @@ class StartCrawlRequest(BaseModel):
 
 class CheckRobotsRequest(BaseModel):
     url: str
+
+class YouTubeExtractRequest(BaseModel):
+    channel_url: str
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    export_format: str = "csv"
 
 class ConnectionManager:
     def __init__(self):
@@ -45,6 +52,7 @@ def create_app(db_path: str = "crawler.db", output_dir: str = "./output") -> Fas
     exporter = ArticleExporter(base_output_dir=output_dir)
     robots_checker = RobotsChecker()
     ws_manager = ConnectionManager()
+    yt_extractor = YouTubeExtractor(output_dir=output_dir)
     
     # Single active engine instance
     engine = CrawlEngine(db=db, exporter=exporter)
@@ -183,6 +191,31 @@ def create_app(db_path: str = "crawler.db", output_dir: str = "./output") -> Fas
             "articles": articles,
             "urls": urls
         }
+
+    @app.post("/api/youtube/extract")
+    async def extract_youtube(req: YouTubeExtractRequest):
+        try:
+            # Run extraction in thread pool since yt-dlp is synchronous/blocking
+            result = await asyncio.to_thread(
+                yt_extractor.extract,
+                channel_url=req.channel_url,
+                start_date=req.start_date,
+                end_date=req.end_date,
+                export_format=req.export_format
+            )
+            return {
+                "status": "success",
+                **result
+            }
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/api/youtube/download/{filename}")
+    async def download_youtube_export(filename: str):
+        file_path = os.path.join(output_dir, filename)
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail="File not found")
+        return FileResponse(file_path, filename=filename)
 
     @app.websocket("/ws/progress")
     async def websocket_progress(websocket: WebSocket):

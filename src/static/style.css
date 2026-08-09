@@ -250,10 +250,16 @@ html, body {
     border: 1px solid rgba(16, 185, 129, 0.3);
 }
 
-.badge.cancelled, .badge.failed {
+.badge.cancelled, .badge.failed, .badge.interrupted {
     background: rgba(244, 63, 94, 0.15);
     color: var(--accent-rose);
     border: 1px solid rgba(244, 63, 94, 0.3);
+}
+
+.badge.interrupted {
+    background: rgba(245, 158, 11, 0.15);
+    color: var(--accent-amber);
+    border: 1px solid rgba(245, 158, 11, 0.3);
 }
 
 /* Config Body */
@@ -812,3 +818,143 @@ html, body {
     50% { opacity: 1; }
     100% { opacity: 0.6; }
 }
+
+/* Tool Navigation Switcher */
+.tool-nav-bar {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    background: rgba(13, 17, 26, 0.6);
+    padding: 0.3rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--bg-card-border);
+    width: fit-content;
+}
+
+.tool-nav-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.4rem 0.9rem;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 0.84rem;
+    font-weight: 600;
+    font-family: var(--font-main);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.tool-nav-btn:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.tool-nav-btn.active {
+    background: var(--gradient-primary);
+    color: #ffffff;
+    box-shadow: 0 2px 10px rgba(56, 189, 248, 0.3);
+}
+
+/* Date Filter Grid */
+.date-filter-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.6rem;
+    margin-top: 0.25rem;
+}
+
+.date-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.date-label {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.date-picker-input {
+    width: 100%;
+    padding: 0.55rem 0.75rem;
+    background: var(--bg-input);
+    border: 1px solid var(--bg-card-border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-family: var(--font-main);
+    font-size: 0.82rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.date-picker-input:focus {
+    border-color: var(--accent-blue);
+}
+
+.date-picker-input::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    cursor: pointer;
+}
+
+.yt-video-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.65rem 0.85rem;
+    background: rgba(13, 17, 26, 0.4);
+    border: 1px solid var(--bg-card-border);
+    border-radius: var(--radius-sm);
+    margin-bottom: 0.4rem;
+    transition: all 0.2s ease;
+}
+
+.yt-video-item:hover {
+    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.yt-video-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    overflow: hidden;
+}
+
+.yt-video-title {
+    font-size: 0.84rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.yt-video-url {
+    font-size: 0.75rem;
+    font-family: var(--font-mono);
+    color: var(--accent-blue);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.yt-video-url:hover {
+    text-decoration: underline;
+}
+
+.yt-video-date-badge {
+    font-size: 0.7rem;
+    padding: 0.15rem 0.45rem;
+    border-radius: 4px;
+    background: rgba(56, 189, 248, 0.1);
+    color: var(--accent-blue);
+    border: 1px solid rgba(56, 189, 248, 0.2);
+    font-family: var(--font-mono);
+    white-space: nowrap;
+}
+

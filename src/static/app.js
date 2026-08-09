@@ -278,6 +278,10 @@ function updateJobStatus(status) {
             completionBanner.style.display = "flex";
             completionBanner.className = "completion-banner failed";
             completionText.textContent = "✖ 爬取失敗，請檢查網址或網路連線後重試";
+        } else if (status === "interrupted") {
+            completionBanner.style.display = "flex";
+            completionBanner.className = "completion-banner cancelled";
+            completionText.textContent = "⚠ 上次爬取因程式重啟而中斷，重新輸入同一網址可繼續抓取";
         }
     }
 }
@@ -289,6 +293,7 @@ function getStatusText(status) {
         case "completed": return "爬取完成";
         case "cancelled": return "已取消";
         case "failed": return "失敗";
+        case "interrupted": return "已中斷";
         default: return "閒置中";
     }
 }
@@ -299,8 +304,13 @@ function updateStats(stats) {
         updateDiscoveredCount(stats.discovered);
     }
     if (stats.crawled_articles !== undefined) {
-        statCrawled.textContent = stats.crawled_articles;
+        const skippedCount = stats.skipped || 0;
+        const totalProcessed = stats.crawled_articles + skippedCount;
+        statCrawled.textContent = totalProcessed;
         articleCount.textContent = stats.crawled_articles;
+        
+        const statSkipped = document.getElementById("statSkipped");
+        if (statSkipped) statSkipped.textContent = skippedCount;
     }
     if (stats.failed !== undefined) statFailed.textContent = stats.failed;
 }
@@ -361,6 +371,8 @@ async function startCrawl(ignoreRobots = false) {
     statDiscovered.textContent = "0";
     statCrawled.textContent = "0";
     statFailed.textContent = "0";
+    const statSkipped = document.getElementById("statSkipped");
+    if (statSkipped) statSkipped.textContent = "0";
     document.getElementById("completionBanner").style.display = "none";
     discoveredCount.textContent = "0";
     articleCount.textContent = "0";
@@ -440,6 +452,148 @@ copyFolderBtn.onclick = () => {
     });
 };
 
+// Tool Mode Switching (Website Crawler vs YouTube Extractor)
+function switchToolMode(mode) {
+    const toolCrawlerBtn = document.getElementById("toolCrawlerBtn");
+    const toolYoutubeBtn = document.getElementById("toolYoutubeBtn");
+    const crawlerView = document.getElementById("crawlerView");
+    const youtubeView = document.getElementById("youtubeView");
+
+    if (mode === "crawler") {
+        toolCrawlerBtn.classList.add("active");
+        toolYoutubeBtn.classList.remove("active");
+        crawlerView.style.display = "grid";
+        youtubeView.style.display = "none";
+    } else {
+        toolYoutubeBtn.classList.add("active");
+        toolCrawlerBtn.classList.remove("active");
+        youtubeView.style.display = "grid";
+        crawlerView.style.display = "none";
+    }
+}
+
+// YouTube Video Extractor Logic
+const ytForm = document.getElementById("ytForm");
+const ytChannelUrl = document.getElementById("ytChannelUrl");
+const ytStartDate = document.getElementById("ytStartDate");
+const ytEndDate = document.getElementById("ytEndDate");
+const ytExportFormat = document.getElementById("ytExportFormat");
+const ytStartBtn = document.getElementById("ytStartBtn");
+const ytStatusBadge = document.getElementById("ytStatusBadge");
+const ytOutputBox = document.getElementById("ytOutputBox");
+const ytExportSummaryText = document.getElementById("ytExportSummaryText");
+const ytExportFilenameText = document.getElementById("ytExportFilenameText");
+const ytDownloadLink = document.getElementById("ytDownloadLink");
+const ytVideoCount = document.getElementById("ytVideoCount");
+const ytVideoList = document.getElementById("ytVideoList");
+const ytEmptyState = document.getElementById("ytEmptyState");
+const ytCopyAllBtn = document.getElementById("ytCopyAllBtn");
+
+let currentYoutubeVideos = [];
+
+if (ytForm) {
+    ytForm.onsubmit = async (e) => {
+        e.preventDefault();
+        const channelUrl = ytChannelUrl.value.trim();
+        if (!channelUrl) return;
+
+        const startDate = ytStartDate.value || null;
+        const endDate = ytEndDate.value || null;
+        const exportFormat = ytExportFormat.value || "csv";
+
+        // Update UI to loading state
+        ytStartBtn.disabled = true;
+        ytStartBtn.innerHTML = `<span class="pulse-dot" style="display:inline-block; margin-right:6px;"></span> 正在分析頻道與抓取影片...`;
+        ytStatusBadge.textContent = "擷取中...";
+        ytStatusBadge.className = "badge badge-running";
+
+        try {
+            const res = await fetch("/api/youtube/extract", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    channel_url: channelUrl,
+                    start_date: startDate,
+                    end_date: endDate,
+                    export_format: exportFormat
+                })
+            });
+
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.detail || "擷取失敗");
+            }
+
+            const data = await res.json();
+            currentYoutubeVideos = data.video_urls || [];
+
+            // Update stats and download box
+            ytVideoCount.textContent = data.total_count || 0;
+            ytExportSummaryText.textContent = `共擷取 ${data.total_count || 0} 部影片`;
+            ytExportFilenameText.textContent = data.export_filename;
+            ytDownloadLink.href = `/api/youtube/download/${data.export_filename}`;
+            ytDownloadLink.setAttribute("download", data.export_filename);
+            ytOutputBox.style.display = "flex";
+
+            // Render list
+            ytVideoList.innerHTML = "";
+            if (currentYoutubeVideos.length > 0) {
+                ytEmptyState.style.display = "none";
+                ytVideoList.style.display = "block";
+                ytCopyAllBtn.style.display = "inline-flex";
+
+                currentYoutubeVideos.forEach((url, idx) => {
+                    const li = document.createElement("li");
+                    li.className = "yt-video-item";
+                    li.innerHTML = `
+                        <div class="yt-video-info">
+                            <span class="yt-video-title">影片 #${idx + 1}</span>
+                            <a href="${url}" target="_blank" rel="noopener noreferrer" class="yt-video-url">
+                                ${url}
+                                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                            </a>
+                        </div>
+                    `;
+                    ytVideoList.appendChild(li);
+                });
+            } else {
+                ytEmptyState.style.display = "flex";
+                ytEmptyState.innerHTML = `
+                    <div class="empty-icon">🔍</div>
+                    <p>未找到符合條件的影片</p>
+                    <small>請確認日期範圍或頻道網址是否正確</small>
+                `;
+                ytVideoList.style.display = "none";
+                ytCopyAllBtn.style.display = "none";
+            }
+
+            ytStatusBadge.textContent = "擷取完成";
+            ytStatusBadge.className = "badge badge-completed";
+        } catch (err) {
+            console.error("YouTube extract error:", err);
+            alert("YouTube 影片擷取失敗：" + err.message);
+            ytStatusBadge.textContent = "擷取失敗";
+            ytStatusBadge.className = "badge badge-failed";
+        } finally {
+            ytStartBtn.disabled = false;
+            ytStartBtn.innerHTML = `
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                開始擷取影片連結
+            `;
+        }
+    };
+}
+
+if (ytCopyAllBtn) {
+    ytCopyAllBtn.onclick = () => {
+        if (currentYoutubeVideos.length === 0) return;
+        const text = currentYoutubeVideos.join("\n");
+        navigator.clipboard.writeText(text).then(() => {
+            alert(`已複製 ${currentYoutubeVideos.length} 個影片連結到剪貼簿！`);
+        });
+    };
+}
+
 // Initial state fetch
 async function loadInitialState() {
     try {
@@ -473,3 +627,4 @@ window.onload = () => {
     initWebSocket();
     loadInitialState();
 };
+
