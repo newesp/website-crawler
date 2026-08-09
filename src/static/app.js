@@ -238,6 +238,11 @@ function updateJobStatus(status) {
     jobStatusBadge.className = `badge ${status}`;
 
     const inlineControls = document.getElementById("inlineControls");
+    const completionBanner = document.getElementById("completionBanner");
+    const completionText = document.getElementById("completionText");
+
+    // Hide completion banner by default
+    completionBanner.style.display = "none";
 
     if (status === "running") {
         startBtn.style.display = "none";
@@ -259,6 +264,21 @@ function updateJobStatus(status) {
         rootUrlInput.disabled = false;
         outputFormatSelect.disabled = false;
         clearActiveUrl();
+
+        // Show completion banner for terminal states
+        if (status === "completed") {
+            completionBanner.style.display = "flex";
+            completionBanner.className = "completion-banner";
+            completionText.textContent = "✔ 爬取完成！所有文章已儲存至本機資料夾";
+        } else if (status === "cancelled") {
+            completionBanner.style.display = "flex";
+            completionBanner.className = "completion-banner cancelled";
+            completionText.textContent = "⚠ 爬取已取消，已抓取的文章仍保留在本機";
+        } else if (status === "failed") {
+            completionBanner.style.display = "flex";
+            completionBanner.className = "completion-banner failed";
+            completionText.textContent = "✖ 爬取失敗，請檢查網址或網路連線後重試";
+        }
     }
 }
 
@@ -341,6 +361,7 @@ async function startCrawl(ignoreRobots = false) {
     statDiscovered.textContent = "0";
     statCrawled.textContent = "0";
     statFailed.textContent = "0";
+    document.getElementById("completionBanner").style.display = "none";
     discoveredCount.textContent = "0";
     articleCount.textContent = "0";
 

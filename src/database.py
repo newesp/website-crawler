@@ -1,6 +1,7 @@
 import aiosqlite
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List, Set
+from src.normalizer import normalize_url
 
 class Database:
     def __init__(self, db_path: str = "crawler.db"):
@@ -139,4 +140,4 @@ class Database:
             WHERE j.root_url = ? AND c.status = 'crawled'
             """, (root_url,))
             rows = await cursor.fetchall()
-            return {row[0] for row in rows}
+            return {normalize_url(row[0]) for row in rows}

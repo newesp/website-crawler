@@ -359,6 +359,32 @@ html, body {
     flex: 1;
 }
 
+.completion-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-md);
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--accent-emerald);
+    margin-top: 0.4rem;
+}
+
+.completion-banner.failed {
+    background: rgba(244, 63, 94, 0.12);
+    border-color: rgba(244, 63, 94, 0.3);
+    color: var(--accent-rose);
+}
+
+.completion-banner.cancelled {
+    background: rgba(245, 158, 11, 0.12);
+    border-color: rgba(245, 158, 11, 0.3);
+    color: var(--accent-amber);
+}
+
 .btn-primary {
     background: var(--gradient-primary);
     color: white;
