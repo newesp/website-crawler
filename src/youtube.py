@@ -40,6 +40,86 @@ def normalize_youtube_channel_url(url: str) -> str:
 class YouTubeExtractor:
     def __init__(self, output_dir: str = "./output"):
         self.output_dir = output_dir
+        self._date_cache = {}
+
+    def _get_video_date(self, url: str, entry: Optional[dict] = None) -> Optional[datetime.date]:
+        if entry:
+            release_timestamp = entry.get("release_timestamp") or entry.get("timestamp")
+            if release_timestamp:
+                try:
+                    return datetime.fromtimestamp(release_timestamp).date()
+                except Exception:
+                    pass
+            upload_date_str = entry.get("upload_date")
+            if upload_date_str and len(upload_date_str) == 8:
+                try:
+                    return datetime.strptime(upload_date_str, "%Y%m%d").date()
+                except Exception:
+                    pass
+
+        if url in self._date_cache:
+            return self._date_cache[url]
+
+        ydl_opts = {
+            "quiet": True,
+            "no_warnings": True,
+            "extract_flat": False,
+        }
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=False, process=False)
+                if info:
+                    date_str = info.get("upload_date")
+                    if date_str and len(date_str) == 8:
+                        d = datetime.strptime(date_str, "%Y%m%d").date()
+                        self._date_cache[url] = d
+                        return d
+        except Exception:
+            pass
+        self._date_cache[url] = None
+        return None
+
+    def _find_date_index(self, entries: List[dict], target_date: datetime.date, find_start: bool) -> int:
+        if not entries:
+            return 0
+        
+        low = 0
+        high = len(entries) - 1
+        best_idx = 0 if find_start else len(entries) - 1
+        
+        while low <= high:
+            mid = (low + high) // 2
+            entry = entries[mid]
+            url = entry.get("url")
+            if not url and entry.get("id"):
+                url = f"https://www.youtube.com/watch?v={entry['id']}"
+            if not url:
+                low += 1
+                continue
+                
+            if not url.startswith("http"):
+                url = f"https://www.youtube.com/watch?v={url}"
+
+            d = self._get_video_date(url, entry)
+            if not d:
+                # If we really can't get date, try next
+                low += 1
+                continue
+                
+            if find_start:
+                if d >= target_date:
+                    best_idx = mid
+                    low = mid + 1
+                else:
+                    high = mid - 1
+            else:
+                if d <= target_date:
+                    best_idx = mid
+                    high = mid - 1
+                else:
+                    low = mid + 1
+                    
+        return best_idx
 
     def extract(
         self,
@@ -94,51 +174,67 @@ class YouTubeExtractor:
             for entry in entries:
                 if not entry:
                     continue
-
-                # Get video URL
                 v_url = entry.get("url")
                 if not v_url and entry.get("id"):
                     v_url = f"https://www.youtube.com/watch?v={entry.get('id')}"
-                
                 if not v_url:
                     continue
-
-                # Ensure canonical video link
                 if not v_url.startswith("http"):
                     v_url = f"https://www.youtube.com/watch?v={v_url}"
+                matched_videos.append(entry)
 
-                # Date filtering (upload_date is YYYYMMDD, release_timestamp is epoch)
-                video_date = None
-                upload_date_str = entry.get("upload_date")
-                release_timestamp = entry.get("release_timestamp") or entry.get("timestamp")
+            # Date filtering with binary search + buffer
+            if dt_start or dt_end:
+                start_idx = 0
+                end_idx = len(matched_videos) - 1
+                buffer_size = 10
 
-                if release_timestamp:
-                    try:
-                        # Local date approximation from timestamp
-                        video_date = datetime.fromtimestamp(release_timestamp)
-                    except Exception:
-                        pass
-                elif upload_date_str and len(upload_date_str) == 8:
-                    try:
-                        video_date = datetime.strptime(upload_date_str, "%Y%m%d")
-                    except Exception:
-                        pass
+                if dt_start:
+                    end_idx = self._find_date_index(matched_videos, dt_start.date(), find_start=True)
+                    end_idx = min(len(matched_videos) - 1, end_idx + buffer_size)
 
-                if video_date:
-                    v_date_only = video_date.date()
-                    if dt_start and v_date_only < dt_start.date():
-                        continue
-                    if dt_end and v_date_only > dt_end.date():
-                        continue
-                else:
-                    # If date is completely unknown and date filters are set, we include it by default or keep it
-                    pass
+                if dt_end:
+                    start_idx = self._find_date_index(matched_videos, dt_end.date(), find_start=False)
+                    start_idx = max(0, start_idx - buffer_size)
 
-                matched_videos.append({
-                    "url": v_url,
-                    "title": entry.get("title", ""),
-                    "date": video_date.strftime("%Y-%m-%d") if video_date else ""
-                })
+                candidate_entries = matched_videos[start_idx:end_idx + 1]
+                
+                final_videos = []
+                for entry in candidate_entries:
+                    v_url = entry.get("url")
+                    if not v_url and entry.get("id"):
+                        v_url = f"https://www.youtube.com/watch?v={entry.get('id')}"
+                    if not v_url.startswith("http"):
+                        v_url = f"https://www.youtube.com/watch?v={v_url}"
+                        
+                    d = self._get_video_date(v_url, entry)
+                    if d:
+                        if dt_start and d < dt_start.date():
+                            continue
+                        if dt_end and d > dt_end.date():
+                            continue
+                    
+                    final_videos.append({
+                        "url": v_url,
+                        "title": entry.get("title", ""),
+                        "date": d.strftime("%Y-%m-%d") if d else ""
+                    })
+                matched_videos = final_videos
+            else:
+                # Map to format if no filters
+                final_videos = []
+                for entry in matched_videos:
+                    v_url = entry.get("url")
+                    if not v_url and entry.get("id"):
+                        v_url = f"https://www.youtube.com/watch?v={entry.get('id')}"
+                    if not v_url.startswith("http"):
+                        v_url = f"https://www.youtube.com/watch?v={v_url}"
+                    final_videos.append({
+                        "url": v_url,
+                        "title": entry.get("title", ""),
+                        "date": ""
+                    })
+                matched_videos = final_videos
 
         # Generate export file
         os.makedirs(self.output_dir, exist_ok=True)
@@ -171,6 +267,7 @@ class YouTubeExtractor:
             "channel_title": channel_title,
             "total_count": len(video_urls),
             "video_urls": video_urls,
+            "videos": matched_videos,
             "export_path": export_path,
             "export_filename": filename,
             "format": export_fmt

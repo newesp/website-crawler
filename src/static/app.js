@@ -526,6 +526,7 @@ if (ytForm) {
 
             const data = await res.json();
             currentYoutubeVideos = data.video_urls || [];
+            const videosData = data.videos || [];
 
             // Update stats and download box
             ytVideoCount.textContent = data.total_count || 0;
@@ -537,19 +538,20 @@ if (ytForm) {
 
             // Render list
             ytVideoList.innerHTML = "";
-            if (currentYoutubeVideos.length > 0) {
+            if (videosData.length > 0) {
                 ytEmptyState.style.display = "none";
                 ytVideoList.style.display = "block";
                 ytCopyAllBtn.style.display = "inline-flex";
 
-                currentYoutubeVideos.forEach((url, idx) => {
+                videosData.forEach((video, idx) => {
                     const li = document.createElement("li");
                     li.className = "yt-video-item";
+                    const displayTitle = video.title ? video.title : `影片 #${idx + 1}`;
                     li.innerHTML = `
                         <div class="yt-video-info">
-                            <span class="yt-video-title">影片 #${idx + 1}</span>
-                            <a href="${url}" target="_blank" rel="noopener noreferrer" class="yt-video-url">
-                                ${url}
+                            <span class="yt-video-title">${displayTitle}</span>
+                            <a href="${video.url}" target="_blank" rel="noopener noreferrer" class="yt-video-url">
+                                ${video.url}
                                 <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
                             </a>
                         </div>
