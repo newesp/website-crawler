@@ -28,6 +28,10 @@ class YouTubeExtractRequest(BaseModel):
     end_date: Optional[str] = None
     export_format: str = "csv"
 
+class YouTubeDownloadRequest(BaseModel):
+    url: str
+    quality: Optional[str] = "1080p"
+
 class ConnectionManager:
     def __init__(self):
         self.active_connections: List[WebSocket] = []
@@ -207,6 +211,34 @@ def create_app(db_path: str = "crawler.db", output_dir: str = "./output") -> Fas
                 "status": "success",
                 **result
             }
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/api/youtube/download")
+    async def download_youtube_video(req: YouTubeDownloadRequest):
+        try:
+            loop = asyncio.get_event_loop()
+
+            def on_progress(p_data: dict):
+                try:
+                    if loop.is_running():
+                        asyncio.run_coroutine_threadsafe(
+                            ws_manager.broadcast({
+                                "event": "youtube_download_progress",
+                                **p_data
+                            }),
+                            loop
+                        )
+                except Exception:
+                    pass
+
+            result = await asyncio.to_thread(
+                yt_extractor.download_video,
+                url=req.url,
+                quality=req.quality,
+                progress_callback=on_progress
+            )
+            return result
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 

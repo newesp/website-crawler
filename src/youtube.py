@@ -37,6 +37,43 @@ def normalize_youtube_channel_url(url: str) -> str:
 
     return url
 
+def is_single_video_url(url: str) -> bool:
+    """
+    Determines if the URL is a single YouTube video (e.g., watch?v=..., youtu.be/..., shorts/..., live/...).
+    """
+    if not url:
+        return False
+    url = url.strip()
+    patterns = [
+        r"(?:https?://)?(?:www\.)?youtube\.com/watch\?v=([a-zA-Z0-9_-]+)",
+        r"(?:https?://)?youtu\.be/([a-zA-Z0-9_-]+)",
+        r"(?:https?://)?(?:www\.)?youtube\.com/shorts/([a-zA-Z0-9_-]+)",
+        r"(?:https?://)?(?:www\.)?youtube\.com/live/([a-zA-Z0-9_-]+)",
+    ]
+    for pattern in patterns:
+        if re.search(pattern, url, re.IGNORECASE):
+            return True
+    return False
+
+def extract_video_id(url: str) -> Optional[str]:
+    """
+    Extracts the YouTube 11-character video ID from supported URL patterns.
+    """
+    if not url:
+        return None
+    url = url.strip()
+    patterns = [
+        r"(?:https?://)?(?:www\.)?youtube\.com/watch\?v=([a-zA-Z0-9_-]+)",
+        r"(?:https?://)?youtu\.be/([a-zA-Z0-9_-]+)",
+        r"(?:https?://)?(?:www\.)?youtube\.com/shorts/([a-zA-Z0-9_-]+)",
+        r"(?:https?://)?(?:www\.)?youtube\.com/live/([a-zA-Z0-9_-]+)",
+    ]
+    for pattern in patterns:
+        m = re.search(pattern, url, re.IGNORECASE)
+        if m:
+            return m.group(1)
+    return None
+
 class YouTubeExtractor:
     def __init__(self, output_dir: str = "./output"):
         self.output_dir = output_dir
@@ -272,3 +309,117 @@ class YouTubeExtractor:
             "export_filename": filename,
             "format": export_fmt
         }
+
+    def download_video(
+        self,
+        url: str,
+        quality: str = "1080p",
+        progress_callback: Optional[Any] = None
+    ) -> Dict[str, Any]:
+        """
+        Downloads a single YouTube video or audio file to output/youtube_videos/.
+        Quality options:
+          - '1080p': Best MP4 up to 1080p
+          - '720p': Best MP4 up to 720p
+          - 'mp3': Best audio converted to MP3
+        """
+        vid_dir = os.path.join(self.output_dir, "youtube_videos")
+        os.makedirs(vid_dir, exist_ok=True)
+
+        vid_id = extract_video_id(url) or "video"
+
+        def _hook(d):
+            if not progress_callback:
+                return
+            try:
+                status = d.get("status")
+                percent = 0.0
+                total = d.get("total_bytes") or d.get("total_bytes_estimate")
+                downloaded = d.get("downloaded_bytes", 0)
+                if total and total > 0:
+                    percent = round((downloaded / total) * 100, 1)
+                elif status == "finished":
+                    percent = 100.0
+
+                speed_bytes = d.get("speed")
+                speed_str = f"{round(speed_bytes / (1024 * 1024), 1)} MB/s" if speed_bytes else ""
+                eta = d.get("eta")
+                eta_str = f"{eta}s" if eta else ""
+
+                progress_callback({
+                    "video_id": vid_id,
+                    "status": status,
+                    "percent": percent,
+                    "speed": speed_str,
+                    "eta": eta_str,
+                    "filename": os.path.basename(d.get("filename", "")),
+                })
+            except Exception:
+                pass
+
+        outtmpl = os.path.join(vid_dir, "%(title).100s_%(id)s.%(ext)s")
+
+        quality_clean = (quality or "1080p").lower()
+        if quality_clean == "mp3":
+            ydl_opts = {
+                "format": "bestaudio/best",
+                "outtmpl": outtmpl,
+                "quiet": True,
+                "no_warnings": True,
+                "progress_hooks": [_hook],
+                "postprocessors": [{
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "mp3",
+                    "preferredquality": "192",
+                }],
+            }
+        elif quality_clean == "720p":
+            ydl_opts = {
+                "format": "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best",
+                "outtmpl": outtmpl,
+                "quiet": True,
+                "no_warnings": True,
+                "progress_hooks": [_hook],
+            }
+        else: # 1080p / default
+            ydl_opts = {
+                "format": "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best",
+                "outtmpl": outtmpl,
+                "quiet": True,
+                "no_warnings": True,
+                "progress_hooks": [_hook],
+            }
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            if not info:
+                raise ValueError("Could not extract video info")
+
+            actual_id = info.get("id", vid_id)
+            actual_title = info.get("title", "youtube_video")
+            safe_title = re.sub(r'[\\/*?:"<>| ]+', "_", actual_title)[:100]
+
+            # Execute download
+            ydl.download([url])
+
+            ext = "mp3" if quality_clean == "mp3" else info.get("ext", "mp4")
+            filename = f"{safe_title}_{actual_id}.{ext}"
+            file_path = os.path.join(vid_dir, filename)
+
+            # Check if file exists under actual prepared filename
+            if not os.path.exists(file_path):
+                # Search in vid_dir for actual_id matching file
+                for f in os.listdir(vid_dir):
+                    if actual_id in f:
+                        filename = f
+                        file_path = os.path.join(vid_dir, f)
+                        break
+
+            return {
+                "status": "success",
+                "video_id": actual_id,
+                "title": actual_title,
+                "file_path": file_path,
+                "filename": filename,
+                "quality": quality_clean
+            }

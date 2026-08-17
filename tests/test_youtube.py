@@ -128,3 +128,70 @@ def test_extract_videos_with_date_range(mock_ydl_class, tmp_path):
     assert result["video_urls"] == [
         "https://www.youtube.com/watch?v=vid2",
     ]
+
+def test_is_single_video_url():
+    from src.youtube import is_single_video_url, extract_video_id
+    assert is_single_video_url("https://www.youtube.com/watch?v=dQw4w9WgXcQ") is True
+    assert is_single_video_url("http://youtube.com/watch?v=dQw4w9WgXcQ&t=10s") is True
+    assert is_single_video_url("https://youtu.be/dQw4w9WgXcQ") is True
+    assert is_single_video_url("https://www.youtube.com/shorts/dQw4w9WgXcQ") is True
+    assert is_single_video_url("https://www.youtube.com/live/dQw4w9WgXcQ") is True
+    
+    # Negative cases (channels)
+    assert is_single_video_url("https://www.youtube.com/@channel") is False
+    assert is_single_video_url("https://www.youtube.com/channel/UC12345") is False
+    assert is_single_video_url("@channel") is False
+    assert is_single_video_url("") is False
+
+    # Extract ID
+    assert extract_video_id("https://www.youtube.com/watch?v=dQw4w9WgXcQ") == "dQw4w9WgXcQ"
+    assert extract_video_id("https://youtu.be/dQw4w9WgXcQ") == "dQw4w9WgXcQ"
+    assert extract_video_id("https://www.youtube.com/shorts/dQw4w9WgXcQ") == "dQw4w9WgXcQ"
+
+@patch("src.youtube.yt_dlp.YoutubeDL")
+def test_download_video_1080p(mock_ydl_class, tmp_path):
+    mock_ydl = MagicMock()
+    mock_ydl_class.return_value.__enter__.return_value = mock_ydl
+    mock_ydl.extract_info.return_value = {
+        "id": "vid123",
+        "title": "Sample Video Title",
+        "ext": "mp4",
+    }
+    
+    progress_updates = []
+    def on_progress(p):
+        progress_updates.append(p)
+
+    extractor = YouTubeExtractor(output_dir=str(tmp_path))
+    res = extractor.download_video(
+        url="https://www.youtube.com/watch?v=vid123",
+        quality="1080p",
+        progress_callback=on_progress
+    )
+
+    assert res["status"] == "success"
+    assert res["video_id"] == "vid123"
+    assert res["title"] == "Sample Video Title"
+    assert "youtube_videos" in res["file_path"]
+    assert mock_ydl.download.called
+
+@patch("src.youtube.yt_dlp.YoutubeDL")
+def test_download_video_mp3(mock_ydl_class, tmp_path):
+    mock_ydl = MagicMock()
+    mock_ydl_class.return_value.__enter__.return_value = mock_ydl
+    mock_ydl.extract_info.return_value = {
+        "id": "vid456",
+        "title": "Audio Track",
+        "ext": "mp3",
+    }
+
+    extractor = YouTubeExtractor(output_dir=str(tmp_path))
+    res = extractor.download_video(
+        url="https://www.youtube.com/watch?v=vid456",
+        quality="mp3"
+    )
+
+    assert res["status"] == "success"
+    assert res["video_id"] == "vid456"
+    assert mock_ydl.download.called
+

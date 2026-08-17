@@ -136,6 +136,11 @@ function handleCrawlerEvent(data) {
         updateLinkStatus(data.url, "crawled");
     }
 
+    // YouTube Download Progress
+    if (data.event === "youtube_download_progress") {
+        handleYoutubeDownloadProgress(data);
+    }
+
     // Job finalized
     if (data.event === "job_completed" || data.event === "job_failed" || data.event === "status_change") {
         if (data.status !== "running") {
@@ -472,13 +477,19 @@ function switchToolMode(mode) {
     }
 }
 
-// YouTube Video Extractor Logic
+// YouTube Video Extractor & Downloader Logic
 const ytForm = document.getElementById("ytForm");
 const ytChannelUrl = document.getElementById("ytChannelUrl");
 const ytStartDate = document.getElementById("ytStartDate");
 const ytEndDate = document.getElementById("ytEndDate");
 const ytExportFormat = document.getElementById("ytExportFormat");
+const ytQuality = document.getElementById("ytQuality");
 const ytStartBtn = document.getElementById("ytStartBtn");
+const ytStartDownloadBtn = document.getElementById("ytStartDownloadBtn");
+const ytDateFilterGroup = document.getElementById("ytDateFilterGroup");
+const ytExportFormatGroup = document.getElementById("ytExportFormatGroup");
+const ytUrlHelper = document.getElementById("ytUrlHelper");
+
 const ytStatusBadge = document.getElementById("ytStatusBadge");
 const ytOutputBox = document.getElementById("ytOutputBox");
 const ytExportSummaryText = document.getElementById("ytExportSummaryText");
@@ -490,12 +501,212 @@ const ytEmptyState = document.getElementById("ytEmptyState");
 const ytCopyAllBtn = document.getElementById("ytCopyAllBtn");
 
 let currentYoutubeVideos = [];
+const activeDownloads = new Map(); // videoId -> { item, btn, url, filePath }
+
+function isSingleVideoUrl(url) {
+    if (!url) return false;
+    url = url.trim();
+    return /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/|youtube\.com\/live\/)/i.test(url);
+}
+
+function extractVideoId(url) {
+    if (!url) return null;
+    const m = url.match(/(?:watch\?v=|youtu\.be\/|shorts\/|live\/)([a-zA-Z0-9_-]{11})/i);
+    return m ? m[1] : null;
+}
+
+function updateYtInputMode() {
+    const url = ytChannelUrl.value.trim();
+    if (isSingleVideoUrl(url)) {
+        if (ytDateFilterGroup) ytDateFilterGroup.style.display = "none";
+        if (ytExportFormatGroup) ytExportFormatGroup.style.display = "none";
+        if (ytStartBtn) ytStartBtn.style.display = "none";
+        if (ytStartDownloadBtn) ytStartDownloadBtn.style.display = "inline-flex";
+        if (ytUrlHelper) ytUrlHelper.textContent = "✔ 偵測到單一影片網址：已切換為直接下載模式";
+    } else {
+        if (ytDateFilterGroup) ytDateFilterGroup.style.display = "block";
+        if (ytExportFormatGroup) ytExportFormatGroup.style.display = "block";
+        if (ytStartBtn) ytStartBtn.style.display = "inline-flex";
+        if (ytStartDownloadBtn) ytStartDownloadBtn.style.display = "none";
+        if (ytUrlHelper) ytUrlHelper.textContent = "支援頻道 (@name, /channel/...) 或單一影片 (watch?v=..., youtu.be/..., shorts/...)";
+    }
+}
+
+if (ytChannelUrl) {
+    ytChannelUrl.addEventListener("input", updateYtInputMode);
+    ytChannelUrl.addEventListener("change", updateYtInputMode);
+    ytChannelUrl.addEventListener("paste", () => setTimeout(updateYtInputMode, 50));
+}
+
+// WebSocket Download Progress Handler
+function handleYoutubeDownloadProgress(data) {
+    const vidId = data.video_id;
+    const downloadEntry = activeDownloads.get(vidId);
+    let btn = downloadEntry ? downloadEntry.btn : null;
+
+    if (!btn) {
+        const itemEl = document.querySelector(`[data-video-id="${vidId}"]`);
+        if (itemEl) {
+            btn = itemEl.querySelector(".btn-dl-video");
+        }
+    }
+
+    if (!btn) return;
+
+    if (data.status === "downloading") {
+        btn.className = "btn-dl-video downloading";
+        btn.disabled = true;
+        const speedText = data.speed ? ` (${data.speed})` : '';
+        btn.innerHTML = `<span class="dl-spin">⏳</span> ${data.percent}%${speedText}`;
+    } else if (data.status === "finished") {
+        btn.className = "btn-dl-video completed";
+        btn.disabled = false;
+        btn.innerHTML = `✔ 已下載`;
+        if (data.file_path) {
+            if (downloadEntry) downloadEntry.filePath = data.file_path;
+            btn.title = `點擊複製路徑: ${data.file_path}`;
+            btn.onclick = () => {
+                navigator.clipboard.writeText(data.file_path).then(() => {
+                    alert("已複製本機檔案路徑：\n" + data.file_path);
+                });
+            };
+        }
+    } else if (data.status === "error") {
+        btn.className = "btn-dl-video failed";
+        btn.disabled = false;
+        btn.innerHTML = `✖ 失敗 (重試)`;
+    }
+}
+
+// Download Single Video Core Routine
+async function downloadSingleVideo(url, quality, itemElement) {
+    const vidId = extractVideoId(url) || url;
+    const btn = itemElement ? itemElement.querySelector(".btn-dl-video") : null;
+
+    if (btn) {
+        btn.className = "btn-dl-video downloading";
+        btn.disabled = true;
+        btn.innerHTML = `<span class="dl-spin">⏳</span> 下載準備中...`;
+    }
+
+    activeDownloads.set(vidId, { item: itemElement, btn: btn, url: url, filePath: null });
+
+    try {
+        const res = await fetch("/api/youtube/download", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url, quality })
+        });
+
+        const data = await res.json();
+        if (!res.ok || data.status !== "success") {
+            throw new Error(data.detail || data.error || "下載失敗");
+        }
+
+        if (btn) {
+            btn.className = "btn-dl-video completed";
+            btn.disabled = false;
+            btn.innerHTML = `✔ 已下載`;
+            const finalPath = data.file_path || "";
+            btn.title = `點擊複製路徑: ${finalPath}`;
+            btn.onclick = () => {
+                if (finalPath) {
+                    navigator.clipboard.writeText(finalPath).then(() => {
+                        alert("已複製本機檔案路徑：\n" + finalPath);
+                    });
+                }
+            };
+        }
+
+        // Update item title if available
+        if (itemElement && data.title) {
+            const titleEl = itemElement.querySelector(".yt-video-title");
+            if (titleEl && titleEl.textContent.startsWith("單一影片下載")) {
+                titleEl.textContent = data.title;
+            }
+        }
+    } catch (err) {
+        console.error("Video download error:", err);
+        if (btn) {
+            btn.className = "btn-dl-video failed";
+            btn.disabled = false;
+            btn.innerHTML = `✖ 失敗 (重試)`;
+            btn.onclick = () => downloadSingleVideo(url, quality, itemElement);
+        }
+        alert(`影片下載失敗：${err.message}`);
+    }
+}
+
+function renderVideoItem(video, idx) {
+    const li = document.createElement("li");
+    li.className = "yt-video-item";
+    const vidId = extractVideoId(video.url) || video.id || `vid_${idx}`;
+    li.setAttribute("data-video-id", vidId);
+
+    const displayTitle = video.title ? video.title : `影片 #${idx + 1}`;
+
+    li.innerHTML = `
+        <div class="yt-video-info">
+            <span class="yt-video-title">${displayTitle}</span>
+            <a href="${video.url}" target="_blank" rel="noopener noreferrer" class="yt-video-url">
+                ${video.url}
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+            </a>
+        </div>
+        <div class="yt-video-actions">
+            <button type="button" class="btn-dl-video" title="下載此影片">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                下載影片
+            </button>
+        </div>
+    `;
+
+    const dlBtn = li.querySelector(".btn-dl-video");
+    dlBtn.onclick = () => {
+        const quality = ytQuality ? ytQuality.value : "1080p";
+        downloadSingleVideo(video.url, quality, li);
+    };
+
+    return li;
+}
+
+// Single Video Start Download Handler
+if (ytStartDownloadBtn) {
+    ytStartDownloadBtn.onclick = async () => {
+        const url = ytChannelUrl.value.trim();
+        if (!url) return;
+        const quality = ytQuality ? ytQuality.value : "1080p";
+
+        ytEmptyState.style.display = "none";
+        ytVideoList.style.display = "block";
+
+        const videoId = extractVideoId(url) || "video";
+        let existingLi = document.querySelector(`[data-video-id="${videoId}"]`);
+        if (!existingLi) {
+            existingLi = renderVideoItem({
+                url: url,
+                title: `單一影片下載 (${url})`,
+                id: videoId
+            }, ytVideoList.children.length);
+            ytVideoList.prepend(existingLi);
+            ytVideoCount.textContent = ytVideoList.children.length;
+        }
+
+        downloadSingleVideo(url, quality, existingLi);
+    };
+}
 
 if (ytForm) {
     ytForm.onsubmit = async (e) => {
         e.preventDefault();
         const channelUrl = ytChannelUrl.value.trim();
         if (!channelUrl) return;
+
+        // If in single video mode, redirect to single download
+        if (isSingleVideoUrl(channelUrl)) {
+            if (ytStartDownloadBtn) ytStartDownloadBtn.click();
+            return;
+        }
 
         const startDate = ytStartDate.value || null;
         const endDate = ytEndDate.value || null;
@@ -544,18 +755,7 @@ if (ytForm) {
                 ytCopyAllBtn.style.display = "inline-flex";
 
                 videosData.forEach((video, idx) => {
-                    const li = document.createElement("li");
-                    li.className = "yt-video-item";
-                    const displayTitle = video.title ? video.title : `影片 #${idx + 1}`;
-                    li.innerHTML = `
-                        <div class="yt-video-info">
-                            <span class="yt-video-title">${displayTitle}</span>
-                            <a href="${video.url}" target="_blank" rel="noopener noreferrer" class="yt-video-url">
-                                ${video.url}
-                                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-                            </a>
-                        </div>
-                    `;
+                    const li = renderVideoItem(video, idx);
                     ytVideoList.appendChild(li);
                 });
             } else {

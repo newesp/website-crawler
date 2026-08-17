@@ -197,20 +197,32 @@
                 <div class="config-body">
                     <form id="ytForm" class="crawl-form">
                         <div class="form-group">
-                            <label for="ytChannelUrl">YouTube 頻道網址或 handle</label>
+                            <label for="ytChannelUrl">YouTube 頻道或單一影片網址</label>
                             <div class="input-wrapper">
                                 <input 
                                     type="text" 
                                     id="ytChannelUrl" 
                                     name="ytChannelUrl" 
-                                    placeholder="https://www.youtube.com/@channel 或 @channel" 
+                                    placeholder="https://www.youtube.com/@channel 或 影片網址" 
                                     required
                                 />
                             </div>
-                            <small class="helper-text">支援 @頻道名稱、/channel/UC... 或 /c/... 格式</small>
+                            <small class="helper-text" id="ytUrlHelper">支援頻道 (@name, /channel/...) 或單一影片 (watch?v=..., youtu.be/..., shorts/...)</small>
                         </div>
 
-                        <div class="form-group">
+                        <!-- Quality Selection -->
+                        <div class="form-group" id="ytQualityGroup">
+                            <label for="ytQuality">下載畫質 / 格式</label>
+                            <div class="select-wrapper">
+                                <select id="ytQuality" name="ytQuality">
+                                    <option value="1080p" selected>最佳畫質 (1080p / Best MP4)</option>
+                                    <option value="720p">標準畫質 (720p MP4)</option>
+                                    <option value="mp3">僅下載音訊 (MP3 音樂檔)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-group" id="ytDateFilterGroup">
                             <label>發布日期篩選（本地時間）</label>
                             <div class="date-filter-grid">
                                 <div class="date-input-group">
@@ -225,7 +237,7 @@
                             <small class="helper-text">留空全抓；只填結束抓到該日；只填開始抓到最新</small>
                         </div>
 
-                        <div class="form-group">
+                        <div class="form-group" id="ytExportFormatGroup">
                             <label for="ytExportFormat">匯出格式</label>
                             <div class="select-wrapper">
                                 <select id="ytExportFormat" name="ytExportFormat">
@@ -239,6 +251,10 @@
                             <button type="submit" id="ytStartBtn" class="btn btn-primary btn-full">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
                                 開始擷取影片連結
+                            </button>
+                            <button type="button" id="ytStartDownloadBtn" class="btn btn-primary btn-full" style="display: none;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                開始下載影片
                             </button>
                         </div>
                     </form>

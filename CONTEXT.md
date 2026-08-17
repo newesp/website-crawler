@@ -87,3 +87,20 @@ _Avoid_: Extracted videos, scraped content
 **Publish Date Filter**:
 A date range filter evaluated against the video's public publish date, converted and compared in the user's local timezone.
 _Avoid_: Upload date, stream date
+
+**Video Download Job**:
+An asynchronous task triggered to download a single YouTube video or audio file to the local storage directory.
+_Avoid_: Stream rip, scraping task
+
+**Media Format Option**:
+The user-selected target format and quality resolution for downloading a video (e.g., 1080p, 720p, or MP3 Audio Only).
+_Avoid_: Codec profile, stream type
+
+**Video Storage Directory**:
+The local destination folder (`output/youtube_videos/`) where downloaded video and audio files are archived.
+_Avoid_: Cache folder, temp dir
+
+**Single Video Input Mode**:
+The dynamic UI state triggered when the user enters a specific video URL instead of a channel URL, replacing extraction controls with immediate download actions.
+_Avoid_: Video URL mode, single link view
+

@@ -74,3 +74,26 @@ def test_youtube_extract_endpoint(mock_extract, client):
     assert len(data["video_urls"]) == 2
     assert "export_filename" in data
 
+@patch("src.youtube.YouTubeExtractor.download_video")
+def test_youtube_download_endpoint(mock_download, client):
+    mock_download.return_value = {
+        "status": "success",
+        "video_id": "vid123",
+        "title": "My Sample Video",
+        "file_path": "./output/youtube_videos/My_Sample_Video_vid123.mp4",
+        "filename": "My_Sample_Video_vid123.mp4",
+        "quality": "1080p"
+    }
+
+    response = client.post("/api/youtube/download", json={
+        "url": "https://www.youtube.com/watch?v=vid123",
+        "quality": "1080p"
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "success"
+    assert data["video_id"] == "vid123"
+    assert data["title"] == "My Sample Video"
+    assert "file_path" in data
+
+
