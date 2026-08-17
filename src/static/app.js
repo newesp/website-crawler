@@ -474,6 +474,7 @@ function switchToolMode(mode) {
         toolCrawlerBtn.classList.remove("active");
         youtubeView.style.display = "grid";
         crawlerView.style.display = "none";
+        updateYtInputMode();
     }
 }
 
@@ -506,36 +507,65 @@ const activeDownloads = new Map(); // videoId -> { item, btn, url, filePath }
 function isSingleVideoUrl(url) {
     if (!url) return false;
     url = url.trim();
-    return /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/|youtube\.com\/live\/)/i.test(url);
+    return /(?:youtube\.com\/watch|youtu\.be\/|youtube\.com\/shorts\/|youtube\.com\/live\/)/i.test(url);
 }
 
 function extractVideoId(url) {
     if (!url) return null;
-    const m = url.match(/(?:watch\?v=|youtu\.be\/|shorts\/|live\/)([a-zA-Z0-9_-]{11})/i);
-    return m ? m[1] : null;
+    try {
+        if (url.includes("youtu.be/")) {
+            const parts = url.split("youtu.be/")[1].split(/[?#&]/)[0];
+            if (parts) return parts;
+        }
+        if (url.includes("/shorts/")) {
+            const parts = url.split("/shorts/")[1].split(/[?#&]/)[0];
+            if (parts) return parts;
+        }
+        if (url.includes("/live/")) {
+            const parts = url.split("/live/")[1].split(/[?#&]/)[0];
+            if (parts) return parts;
+        }
+        const match = url.match(/[?&]v=([a-zA-Z0-9_-]+)/);
+        if (match) return match[1];
+        const match2 = url.match(/(?:watch\?v=|youtu\.be\/|shorts\/|live\/)([a-zA-Z0-9_-]{11})/i);
+        return match2 ? match2[1] : null;
+    } catch (e) {
+        return null;
+    }
 }
 
 function updateYtInputMode() {
+    if (!ytChannelUrl) return;
     const url = ytChannelUrl.value.trim();
-    if (isSingleVideoUrl(url)) {
-        if (ytDateFilterGroup) ytDateFilterGroup.style.display = "none";
-        if (ytExportFormatGroup) ytExportFormatGroup.style.display = "none";
-        if (ytStartBtn) ytStartBtn.style.display = "none";
-        if (ytStartDownloadBtn) ytStartDownloadBtn.style.display = "inline-flex";
-        if (ytUrlHelper) ytUrlHelper.textContent = "✔ 偵測到單一影片網址：已切換為直接下載模式";
-    } else {
-        if (ytDateFilterGroup) ytDateFilterGroup.style.display = "block";
-        if (ytExportFormatGroup) ytExportFormatGroup.style.display = "block";
-        if (ytStartBtn) ytStartBtn.style.display = "inline-flex";
-        if (ytStartDownloadBtn) ytStartDownloadBtn.style.display = "none";
-        if (ytUrlHelper) ytUrlHelper.textContent = "支援頻道 (@name, /channel/...) 或單一影片 (watch?v=..., youtu.be/..., shorts/...)";
+    const isSingle = isSingleVideoUrl(url);
+
+    if (ytDateFilterGroup) {
+        ytDateFilterGroup.style.display = isSingle ? "none" : "block";
+    }
+    if (ytExportFormatGroup) {
+        ytExportFormatGroup.style.display = isSingle ? "none" : "block";
+    }
+    if (ytStartBtn) {
+        ytStartBtn.style.display = isSingle ? "none" : "inline-flex";
+    }
+    if (ytStartDownloadBtn) {
+        ytStartDownloadBtn.style.display = isSingle ? "inline-flex" : "none";
+    }
+    if (ytUrlHelper) {
+        ytUrlHelper.textContent = isSingle 
+            ? "✔ 偵測到單一影片網址：已切換為直接下載模式" 
+            : "支援頻道 (@name, /channel/...) 或單一影片 (watch?v=..., youtu.be/..., shorts/...)";
+        ytUrlHelper.style.color = isSingle ? "#10b981" : "";
     }
 }
 
 if (ytChannelUrl) {
     ytChannelUrl.addEventListener("input", updateYtInputMode);
     ytChannelUrl.addEventListener("change", updateYtInputMode);
-    ytChannelUrl.addEventListener("paste", () => setTimeout(updateYtInputMode, 50));
+    ytChannelUrl.addEventListener("keyup", updateYtInputMode);
+    ytChannelUrl.addEventListener("focus", updateYtInputMode);
+    ytChannelUrl.addEventListener("blur", updateYtInputMode);
+    ytChannelUrl.addEventListener("paste", () => setTimeout(updateYtInputMode, 20));
 }
 
 // WebSocket Download Progress Handler
@@ -828,5 +858,8 @@ async function loadInitialState() {
 window.onload = () => {
     initWebSocket();
     loadInitialState();
+    if (typeof updateYtInputMode === "function") {
+        updateYtInputMode();
+    }
 };
 
