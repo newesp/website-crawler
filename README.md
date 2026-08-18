@@ -1,5 +1,9 @@
 # Website & YouTube Crawler
 
+[![Tests & Quality Checks](https://github.com/newesp/website-crawler/actions/workflows/tests.yml/badge.svg)](https://github.com/newesp/website-crawler/actions/workflows/tests.yml)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
+[![Coverage Quality Gate](https://img.shields.io/badge/coverage-%E2%89%A575%25-brightgreen.svg)](#-測試與品質保證-testing--quality-gate)
+
 Website & YouTube Crawler 是一個功能強大且具備現代化操作介面的非同步網頁爬蟲與 YouTube 頻道影片連結擷取工具。
 
 ---
@@ -57,10 +61,10 @@ Website & YouTube Crawler 是一個功能強大且具備現代化操作介面的
 
 ### 1. 安裝環境與依賴
 
-請確保已安裝 Python 3.10+ 環境，然後安裝必要的套件：
+請確保已安裝 Python 3.10+（推薦 3.12+），並透過 `requirements.txt` 安裝相依套件：
 
 ```bash
-pip install fastapi uvicorn httpx beautifulsoup4 playwright aiosqlite markdownify yt-dlp
+pip install -r requirements.txt
 ```
 
 如果是第一次使用 Playwright，請安裝瀏覽器執行核心：
@@ -97,12 +101,46 @@ python run.py
 
 ---
 
-## 🧪 測試 (Testing)
+## 🧪 測試與品質保證 (Testing & Quality Gate)
 
-專案包含完整的 `pytest` 測試集，涵蓋 API 整合測試、爬蟲排程、分類器、YouTube 萃取與日期演算法等：
+本專案實作自動化單元測試與整合測試，並於 GitHub Actions CI 每次 Push 與 Pull Request 自動驗證程式品質與測試覆蓋率。
+
+### 測試策略 (Testing Strategy)
+
+- **單元測試 (Unit Tests - `tests/unit/`)**：
+  - URL 正規化 (`test_normalizer.py`)
+  - 網頁類型與連結分類 (`test_classifier.py`)
+  - HTML 內文與 Markdown 萃取轉換 (`test_extractor.py`)
+  - HTTP 請求封裝與錯誤處置 (`test_fetcher.py`)
+  - Robots.txt 語法與規則檢查 (`test_robots.py`)
+  - 檔案匯出與路徑生成 (`test_exporter.py`)
+- **整合測試 (Integration Tests - `tests/integration/`)**：
+  - 爬蟲核心生命週期與優先佇列排程 (`test_crawler.py`)
+  - 斷點續爬 (Resume / Incremental Crawling) 機制驗證 (`test_crawler.py`)
+  - 網路 Timeout / 錯誤恢復與異常 HTML 容錯處理 (`test_crawler.py`)
+  - SQLite 持久化與任務狀態更新 (`test_database.py`)
+  - FastAPI RESTful API 與 WebSocket 推播 (`test_api.py`)
+  - YouTube 影片萃取、二元搜尋與下載流程 (`test_youtube.py`)
+- **隔離外部相依 (Deterministic & Offline-friendly)**：
+  - 一般 CI 測試全數 Mock 外部網路請求（`httpx.MockTransport` / `unittest.mock`），杜絕因外網不穩定或網站結構變動導致的 Flaky Tests。
+
+### 執行本機測試
 
 ```bash
-pytest tests -v
+# 執行全部測試
+pytest -v
+
+# 僅執行單元測試
+pytest -m unit -v
+
+# 僅執行整合測試
+pytest -m integration -v
+```
+
+### 執行測試覆蓋率檢查 (Coverage Check)
+
+```bash
+pytest --cov=src --cov-report=term-missing --cov-fail-under=75
 ```
 
 ---
@@ -117,4 +155,5 @@ pytest tests -v
 - [x] YouTube 頻道公開影片連結高速擷取
 - [x] YouTube 發布日期區間過濾與二元搜尋加速
 - [x] 現代化雙工具切換 Web Dashboard (WebSocket 即時更新)
+- [x] GitHub Actions CI 自動化測試與覆蓋率 Quality Gate
 - [ ] 支援針對自定義網域撰寫自定義萃取規則（Extraction Rules）

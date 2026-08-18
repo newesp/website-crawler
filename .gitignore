@@ -1,5 +1,21 @@
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+
+# Test & Coverage
 .pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# Data & Output
 crawler.db
 output/
+temp/
+
+# Environment & IDE
+.venv/
+venv/
+.env
+.idea/
+.vscode/
