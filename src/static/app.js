@@ -487,6 +487,7 @@ const ytExportFormat = document.getElementById("ytExportFormat");
 const ytQuality = document.getElementById("ytQuality");
 const ytStartBtn = document.getElementById("ytStartBtn");
 const ytStartDownloadBtn = document.getElementById("ytStartDownloadBtn");
+const ytQualityGroup = document.getElementById("ytQualityGroup");
 const ytDateFilterGroup = document.getElementById("ytDateFilterGroup");
 const ytExportFormatGroup = document.getElementById("ytExportFormatGroup");
 const ytUrlHelper = document.getElementById("ytUrlHelper");
@@ -539,6 +540,9 @@ function updateYtInputMode() {
     const url = ytChannelUrl.value.trim();
     const isSingle = isSingleVideoUrl(url);
 
+    if (ytQualityGroup) {
+        ytQualityGroup.style.display = isSingle ? "block" : "none";
+    }
     if (ytDateFilterGroup) {
         ytDateFilterGroup.style.display = isSingle ? "none" : "block";
     }
@@ -566,6 +570,9 @@ if (ytChannelUrl) {
     ytChannelUrl.addEventListener("focus", updateYtInputMode);
     ytChannelUrl.addEventListener("blur", updateYtInputMode);
     ytChannelUrl.addEventListener("paste", () => setTimeout(updateYtInputMode, 20));
+    
+    // Set initial state
+    updateYtInputMode();
 }
 
 // WebSocket Download Progress Handler

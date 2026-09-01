@@ -74,6 +74,16 @@ def extract_video_id(url: str) -> Optional[str]:
             return m.group(1)
     return None
 
+class FilteredLogger:
+    def debug(self, msg):
+        pass
+    def warning(self, msg):
+        pass
+    def error(self, msg):
+        if "members-only content" in msg or "Join this channel to get access" in msg:
+            return
+        print(msg)
+
 class YouTubeExtractor:
     def __init__(self, output_dir: str = "./output"):
         self.output_dir = output_dir
@@ -101,6 +111,7 @@ class YouTubeExtractor:
             "quiet": True,
             "no_warnings": True,
             "extract_flat": False,
+            "logger": FilteredLogger(),
         }
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -195,6 +206,7 @@ class YouTubeExtractor:
             "no_warnings": True,
             "skip_download": True,
             "ignoreerrors": True,
+            "logger": FilteredLogger(),
         }
 
         matched_videos = []
@@ -366,6 +378,7 @@ class YouTubeExtractor:
                 "outtmpl": outtmpl,
                 "quiet": True,
                 "no_warnings": True,
+                "logger": FilteredLogger(),
                 "progress_hooks": [_hook],
                 "postprocessors": [{
                     "key": "FFmpegExtractAudio",
@@ -379,6 +392,7 @@ class YouTubeExtractor:
                 "outtmpl": outtmpl,
                 "quiet": True,
                 "no_warnings": True,
+                "logger": FilteredLogger(),
                 "progress_hooks": [_hook],
             }
         else: # 1080p / default
@@ -387,6 +401,7 @@ class YouTubeExtractor:
                 "outtmpl": outtmpl,
                 "quiet": True,
                 "no_warnings": True,
+                "logger": FilteredLogger(),
                 "progress_hooks": [_hook],
             }
 
